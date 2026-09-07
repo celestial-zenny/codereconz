@@ -1,0 +1,41 @@
+name: smoke
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # requires-python is >=3.9. The matrix is what proves it, not the claim.
+        python-version: ["3.9", "3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Compile everything
+        run: python -m compileall -q codereconwork dev
+
+      - name: Smoke suites
+        # No network in these; deps hits OSV only when a manifest exists.
+        run: |
+          for f in dev/smoke*.py; do
+            echo "--- $f"
+            python "$f"
+          done
+
+      - name: Install and run the CLI for real
+        run: |
+          pip install .
+          recon --version
+          recon rules --json > /dev/null
+          # Scanning itself finds planted fixture credentials, so exit 1 is correct here.
+          recon code . --no-color --quiet --json report.json || test $? -eq 1
+          python -c "import json; d=json.load(open('report.json')); assert d['findings'], 'no findings'; print(len(d['findings']), 'findings')"

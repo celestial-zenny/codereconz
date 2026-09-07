@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+env/
+
+# Tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Code Recon's own output. A baseline is a report, and a report can contain
+# file paths and rule hits from whatever was scanned -- keep local runs local.
+*.sarif
+recon-report.json
+recon-baseline.json
+recon-audit.log
+
+# Editors / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store

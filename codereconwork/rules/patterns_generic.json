@@ -1,0 +1,181 @@
+{
+  "version": 1,
+  "description": "Language-agnostic rules: transport security, disabled protections, debug exposure, weak algorithms.",
+  "rules": [
+    {
+      "id": "pattern.generic.tls-verification-disabled",
+      "title": "TLS certificate verification disabled",
+      "severity": "high",
+      "confidence": "medium",
+      "keywords": ["verify=false", "verify = false", "ssl_verify", "verify_ssl", "validate_certs", "checkservertrusted", "sslverify", "verifymode"],
+      "regex": "(?i)(?:verify\\s*=\\s*False|ssl[_-]?verify\\s*[=:]\\s*(?:false|0|no|off)|verify[_-]?ssl\\s*[=:]\\s*(?:false|0|no|off)|validate[_-]?certs\\s*[=:]\\s*(?:false|no)|CURLOPT_SSL_VERIFYPEER\\s*,\\s*(?:false|0)|verify_mode\\s*=\\s*(?:OpenSSL::SSL::)?VERIFY_NONE|SSL_VERIFY_NONE)",
+      "cwe": "CWE-295",
+      "tags": ["tls", "mitm"],
+      "remediation": "Disabling verification makes the connection trivially interceptable - encryption without authentication is not security. Point the client at the correct CA bundle instead.",
+      "references": ["https://cwe.mitre.org/data/definitions/295.html"]
+    },
+    {
+      "id": "pattern.generic.cleartext-http-endpoint",
+      "title": "Cleartext HTTP used for an API or auth endpoint",
+      "severity": "medium",
+      "confidence": "medium",
+      "keywords": ["http://"],
+      "regex": "(?i)[\"'](http://(?!localhost|127\\.0\\.0\\.1|0\\.0\\.0\\.0|\\[::1\\]|host\\.docker\\.internal|[a-z0-9.-]*\\.local\\b|[a-z0-9.-]*\\.internal\\b|[a-z0-9.-]*\\.test\\b|[a-z0-9.-]*\\.example\\b|schemas?\\.|www\\.w3\\.org|xmlns)[^\"'\\s]*(?:api|auth|login|token|oauth|graphql|payment|admin|upload)[^\"'\\s]*)[\"']",
+      "group": 1,
+      "cwe": "CWE-319",
+      "tags": ["transport", "cleartext"],
+      "remediation": "Use https. Cleartext credentials and tokens are readable by anything on the path, including the coffee-shop Wi-Fi.",
+      "references": ["https://cwe.mitre.org/data/definitions/319.html"]
+    },
+    {
+      "id": "pattern.generic.auth-disabled-flag",
+      "title": "Authentication or authorization disabled by a flag",
+      "severity": "high",
+      "confidence": "medium",
+      "keywords": ["disable_auth", "disableauth", "skip_auth", "skipauth", "auth_enabled", "authentication", "no_auth", "noauth", "allow_anonymous", "require_auth"],
+      "regex": "(?i)\\b(?:disable[_-]?auth\\w*|skip[_-]?auth\\w*|no[_-]?auth\\w*|auth[_-]?(?:entication)?[_-]?(?:enabled|required)|require[_-]?auth\\w*|enable[_-]?auth\\w*)\\b\\s*[=:]\\s*[\"']?(?:true|false|1|0|yes|no|on|off)",
+      "cwe": "CWE-306",
+      "tags": ["auth", "misconfiguration"],
+      "remediation": "Confirm this is not reachable in production. Auth toggles intended for local development have a habit of shipping enabled, and this is one of the most commonly exploited misconfigurations there is.",
+      "references": ["https://cwe.mitre.org/data/definitions/306.html"]
+    },
+    {
+      "id": "pattern.generic.debug-enabled",
+      "title": "Debug mode enabled",
+      "severity": "medium",
+      "confidence": "medium",
+      "keywords": ["debug", "development"],
+      "regex": "(?i)\\b(?:debug|DEBUG_MODE|APP_DEBUG|FLASK_DEBUG|DJANGO_DEBUG)\\s*[=:]\\s*[\"']?(?:true|1|on|yes)\\b",
+      "not_paths": ["*test*", "*spec*", "*.example", "*.sample", "*.template", "docker-compose.override.yml", "docker-compose.dev.yml"],
+      "cwe": "CWE-489",
+      "tags": ["debug", "information-disclosure"],
+      "remediation": "Debug mode typically exposes stack traces, environment variables, and in Flask/Werkzeug an interactive console that executes arbitrary Python. Drive it from an environment variable that defaults to off.",
+      "references": ["https://cwe.mitre.org/data/definitions/489.html"]
+    },
+    {
+      "id": "pattern.generic.cors-wildcard-header",
+      "title": "Access-Control-Allow-Origin set to a wildcard",
+      "severity": "medium",
+      "confidence": "medium",
+      "keywords": ["access-control-allow-origin"],
+      "regex": "(?i)Access-Control-Allow-Origin[\"']?\\s*[,:=]\\s*[\"']\\*[\"']",
+      "cwe": "CWE-942",
+      "tags": ["cors", "misconfiguration"],
+      "remediation": "Acceptable for genuinely public, unauthenticated data. For anything else, echo a validated origin from an allowlist."
+    },
+    {
+      "id": "pattern.generic.jwt-alg-none",
+      "title": "JWT algorithm set to none",
+      "severity": "critical",
+      "confidence": "high",
+      "keywords": ["alg", "none", "algorithm"],
+      "regex": "(?i)(?:[\"']alg[\"']\\s*:\\s*[\"']none[\"']|algorithm[s]?\\s*[=:]\\s*[\\[\\s\"']*none[\"'\\]]|verify_signature[\"']?\\s*[=:]\\s*False)",
+      "cwe": "CWE-347",
+      "tags": ["auth", "jwt"],
+      "remediation": "alg=none means unsigned - anyone can mint a valid token. Always pass an explicit algorithm allowlist to the verifier."
+    },
+    {
+      "id": "pattern.generic.weak-crypto-algorithm",
+      "title": "Broken or deprecated cryptographic algorithm",
+      "severity": "medium",
+      "confidence": "low",
+      "keywords": ["des", "rc4", "rc2", "md4", "md5", "ecb", "blowfish", "3des"],
+      "regex": "(?i)[\"'](?:DES-[A-Z0-9-]+|DES-ECB|3DES|DES3|RC4(?:-[A-Z0-9]+)?|RC2|MD4|MD2|AES-\\d+-ECB|[A-Z]+/ECB/[A-Za-z0-9]+|BF-[A-Z]+)[\"']",
+      "cwe": "CWE-327",
+      "tags": ["crypto"],
+      "remediation": "Use AES-GCM or ChaCha20-Poly1305 for encryption and SHA-256+ for hashing. ECB mode leaks plaintext structure regardless of the underlying cipher.",
+      "references": ["https://cwe.mitre.org/data/definitions/327.html"]
+    },
+    {
+      "id": "pattern.generic.bind-all-interfaces",
+      "title": "Service bound to all network interfaces",
+      "severity": "low",
+      "confidence": "medium",
+      "keywords": ["0.0.0.0", "::"],
+      "regex": "(?i)(?:host|bind|address|listen|interface)\\w*\\s*[=:]\\s*[\"']?(0\\.0\\.0\\.0|::)[\"']?",
+      "group": 1,
+      "tags": ["exposure", "hardening"],
+      "remediation": "Binding to 0.0.0.0 exposes the service on every interface, including public ones. Bind to 127.0.0.1 unless it genuinely needs to be reachable externally, and put a firewall in front of it either way."
+    },
+    {
+      "id": "pattern.generic.default-credentials",
+      "title": "Default or trivially weak credentials",
+      "severity": "high",
+      "confidence": "medium",
+      "keywords": ["admin", "root", "password", "guest", "test"],
+      "regex": "(?i)(?:user(?:name)?|login|admin_user)\\s*[=:]\\s*[\"'](?:admin|root|administrator|guest|sa|postgres|test)[\"'][\\s\\S]{0,120}?(?:password|passwd|pwd)\\s*[=:]\\s*[\"'](admin|root|password|passwd|123456|12345678|changeme|guest|test|toor|admin123|password123|letmein|secret|qwerty|welcome|default)[\"']",
+      "group": 1,
+      "cwe": "CWE-1392",
+      "tags": ["credential", "default-password"],
+      "remediation": "Default credential pairs are the first thing any scanner or botnet tries. Generate a unique password at provisioning time and require a change on first login."
+    },
+    {
+      "id": "pattern.generic.security-todo",
+      "title": "Comment flags an unresolved security concern",
+      "severity": "info",
+      "confidence": "medium",
+      "match_in_comments": true,
+      "keywords": ["todo", "fixme", "hack", "xxx", "insecure", "vulnerable", "workaround"],
+      "regex": "(?i)(?://|#|/\\*|<!--|--)\\s*(?:TODO|FIXME|HACK|XXX|BUG|WARNING|NOTE)\\b[^\\n]{0,120}?\\b(?:secur\\w*|insecure|vulnerab\\w*|exploit\\w*|inject\\w*|auth\\w*|permission\\w*|sanitiz\\w*|escap\\w*|validat\\w*|encrypt\\w*|password|token|credential|unsafe|temporar\\w*\\s+fix|bypass)\\b",
+      "tags": ["hygiene", "informational"],
+      "remediation": "Someone already knew about this. Worth reading before shipping - self-flagged security debt is unusually high-signal."
+    },
+    {
+      "id": "pattern.generic.permissive-file-mode",
+      "title": "World-writable file mode in code",
+      "severity": "medium",
+      "confidence": "medium",
+      "keywords": ["chmod", "0o777", "0777", "666"],
+      "regex": "(?i)(?:chmod|os\\.chmod|fchmod|umask)\\s*\\(?[^,\\n]*,?\\s*(?:0o?7[0-7]7|0o?666|0o?66[0-7])\\b",
+      "cwe": "CWE-732",
+      "tags": ["permissions"],
+      "remediation": "Any local user can modify a world-writable file. Use 0o600 for secrets and 0o644 for ordinary data."
+    },
+    {
+      "id": "pattern.generic.trust-forwarded-header",
+      "title": "Client IP taken from an untrusted header",
+      "severity": "medium",
+      "confidence": "low",
+      "keywords": ["x-forwarded-for", "x-real-ip", "client-ip"],
+      "regex": "(?i)[\"']?(?:X-Forwarded-For|X-Real-IP|X-Client-IP|CF-Connecting-IP|True-Client-IP)[\"']?\\s*(?:\\]|\\)|,|\\.|\\s)",
+      "cwe": "CWE-290",
+      "tags": ["spoofing"],
+      "remediation": "These headers are attacker-controlled unless a proxy you own overwrites them. If they gate rate limiting, allowlisting, or audit logs, that control is bypassable - trust only the hop count your own proxy sets."
+    },
+    {
+      "id": "pattern.generic.sql-grant-all",
+      "title": "Database grant of all privileges",
+      "severity": "medium",
+      "confidence": "medium",
+      "keywords": ["grant all"],
+      "regex": "(?i)GRANT\\s+ALL(?:\\s+PRIVILEGES)?\\s+ON\\s+[^\\n;]*\\s+TO",
+      "cwe": "CWE-250",
+      "tags": ["database", "least-privilege"],
+      "remediation": "Grant only the statements the application actually issues. An app account with DROP or GRANT rights turns any SQL injection into total loss."
+    },
+    {
+      "id": "pattern.generic.disabled-host-verification",
+      "title": "Hostname verification disabled",
+      "severity": "high",
+      "confidence": "medium",
+      "keywords": ["check_hostname", "hostname_verification", "verifyhostname", "assume_role"],
+      "regex": "(?i)(?:check_hostname\\s*=\\s*False|hostname[_-]?verif\\w*\\s*[=:]\\s*(?:false|none|0|off)|CURLOPT_SSL_VERIFYHOST\\s*,\\s*(?:false|0))",
+      "cwe": "CWE-297",
+      "tags": ["tls", "mitm"],
+      "remediation": "Without hostname verification, a valid certificate for any domain is accepted for yours. Keep it on."
+    },
+    {
+      "id": "pattern.generic.hardcoded-jwt-secret",
+      "title": "Symmetric signing secret hardcoded",
+      "severity": "high",
+      "confidence": "medium",
+      "keywords": ["jwt_secret", "jwtsecret", "secret_key_base", "session_secret", "cookie_secret", "signing_secret", "hmac_key"],
+      "regex": "(?i)\\b(?:jwt[_-]?secret|secret[_-]?key[_-]?base|session[_-]?secret|cookie[_-]?secret|signing[_-]?secret|hmac[_-]?(?:key|secret)|token[_-]?secret)\\b\\s*[=:]\\s*[\"']([^\"'\\s]{8,})[\"']",
+      "group": 1,
+      "reject_placeholders": true,
+      "cwe": "CWE-798",
+      "tags": ["secret", "auth"],
+      "remediation": "Anyone with this value can forge sessions and tokens for every user. Load it from the environment and rotate it - note that rotating invalidates existing sessions."
+    }
+  ]
+}

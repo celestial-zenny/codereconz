@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "code-recon"
+version = "0.1.0"
+description = "Security reconnaissance for codebases: secrets, dangerous patterns, supply chain, attack surface, and gated live probing"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+keywords = ["security", "sast", "secrets", "recon", "sarif", "supply-chain"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
+    "Programming Language :: Python :: 3",
+    "Topic :: Security",
+]
+
+# Intentionally empty. The core runs on the standard library alone so it can be dropped
+# onto a host with no package installs available. See [project.optional-dependencies].
+dependencies = []
+
+[project.optional-dependencies]
+# Nicer terminal tables. Falls back to a plain ANSI renderer when absent.
+pretty = ["rich>=13.0"]
+# Only needed to load YAML-authored custom rule packs. Bundled packs are JSON.
+yaml = ["pyyaml>=6.0"]
+dev = ["pytest>=7.0"]
+
+[project.scripts]
+recon = "codereconwork.cli:main"
+code-recon = "codereconwork.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["codereconwork*"]
+
+[tool.setuptools.package-data]
+codereconwork = ["rules/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["error::DeprecationWarning:codereconwork.*"]
