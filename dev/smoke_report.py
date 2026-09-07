@@ -30,6 +30,7 @@ Exit: 0 if every assertion holds, 1 otherwise.
 from __future__ import annotations
 
 import io
+import importlib.util
 import json
 import sys
 import tempfile
@@ -50,6 +51,10 @@ from codereconwork.core.rules import load_all_builtin  # noqa: E402
 from codereconwork.core.walker import collect  # noqa: E402
 import codereconwork.modules  # noqa: E402,F401  - populates the module registry
 from codereconwork.report import ReportPayload, json_out, sarif, terminal  # noqa: E402
+
+# Whether the optional `rich` extra is present. Both backends must work; only one of them
+# can be tested in any given environment, and CI deliberately runs a bare one.
+RICH_AVAILABLE = importlib.util.find_spec("rich") is not None
 
 # Values that must never appear in full in any output. Same list smoke.py checks, plus
 # one planted inside a non-allowlisted `extra` key. The Slack token is split for the same
@@ -254,12 +259,22 @@ def check_terminal(payload: ReportPayload) -> None:
     check(plain_painter_used, "forcing rich unavailable did not select the plain painter")
     check("-- findings" in fallback, "fallback renderer did not print the findings section")
 
-    rich_painter = terminal._make_painter(io.StringIO(), color=False, width=100)
-    rich_used = type(rich_painter).__name__ == "_RichPainter"
-    check(rich_used, "rich is installed here but the rich painter was not selected")
-    rich_out = render_terminal(payload)
+    # rich is an optional extra, so a bare environment is a legitimate one to test in --
+    # asserting it is installed would make this suite fail on exactly the zero-dependency
+    # setup the project promises to support. Exercise the rich path when it is importable
+    # and say so plainly when it is not.
+    if RICH_AVAILABLE:
+        rich_painter = terminal._make_painter(io.StringIO(), color=False, width=100)
+        check(type(rich_painter).__name__ == "_RichPainter",
+              "rich is installed here but the rich painter was not selected")
+        rich_out = render_terminal(payload)
+        check(rich_out != fallback, "rich and fallback output are identical; one path is not running")
+        variants = (("terminal[rich]", rich_out), ("terminal[plain]", fallback))
+    else:
+        rich_out = None
+        variants = (("terminal[plain]", fallback),)
 
-    for label, text in (("terminal[rich]", rich_out), ("terminal[plain]", fallback)):
+    for label, text in variants:
         check_no_leak(label, text)
         # Invariant 4: a skipped module and a crashed module, with reasons, in the output.
         check("deps" in text, f"{label}: skipped module 'deps' is not in the output")
@@ -278,12 +293,10 @@ def check_terminal(payload: ReportPayload) -> None:
         longest = max(len(line) for line in text.splitlines())
         check(longest <= 200, f"{label}: a line ran to {longest} chars; long snippets are not clipped")
 
-    check(rich_out != fallback, "rich and fallback output are identical; one path is not running")
-
     # --no-color must emit no escapes at all, in either backend.
     payload.config.no_color = True
     try:
-        mono_rich = render_terminal(payload)
+        mono_rich = render_terminal(payload) if RICH_AVAILABLE else ""
         with no_rich():
             mono_plain = render_terminal(payload)
     finally:
@@ -292,7 +305,7 @@ def check_terminal(payload: ReportPayload) -> None:
     check("\x1b" not in mono_plain, "plain backend emitted ANSI escapes with no_color=True")
 
     # A StringIO is not a TTY, so colour must already be off without asking.
-    check("\x1b" not in rich_out and "\x1b" not in fallback,
+    check("\x1b" not in (rich_out or "") and "\x1b" not in fallback,
           "escapes were written to a non-TTY stream")
 
     # Readability at scale: a big scan must not print one line per finding by default.
@@ -536,8 +549,10 @@ def main() -> int:
     data = check_json(payload)
     check_sarif(payload)
 
-    print(f"terminal:    rendered via rich and via the forced fallback, both colour-free "
-          f"on a non-TTY stream")
+    print("terminal:    "
+          + ("rendered via rich and via the forced fallback" if RICH_AVAILABLE
+             else "rendered via the fallback only; SKIPPED the rich path (rich not installed)")
+          + ", colour-free on a non-TTY stream")
     print(f"json:        schema_version={data['schema_version']}, "
           f"{len(data['findings'])} findings, byte-identical across two renders")
     log = json.loads(sarif.render(payload))

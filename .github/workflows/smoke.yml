@@ -23,13 +23,21 @@ jobs:
       - name: Compile everything
         run: python -m compileall -q codereconwork dev
 
-      - name: Smoke suites
-        # No network in these; deps hits OSV only when a manifest exists.
+      - name: Smoke suites (bare env, zero dependencies)
+        # The bare run is the one that matters: the project promises stdlib only.
         run: |
           for f in dev/smoke*.py; do
             echo "--- $f"
             python "$f"
           done
+
+      - name: Smoke suites (with the optional extras installed)
+        # The bare run above skips the rich terminal backend. Install the extras and
+        # re-run so both painters actually get exercised somewhere in CI.
+        run: |
+          pip install '.[pretty,yaml]'
+          python dev/smoke_report.py
+          python dev/smoke.py
 
       - name: Install and run the CLI for real
         run: |
