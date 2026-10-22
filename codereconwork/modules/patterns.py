@@ -1507,6 +1507,12 @@ class PreparedRule:
     capped: bool
 
 
+# Prose and translation catalogs. A rule pinned to no language would otherwise read
+# "More information is available with DEBUG=True." in 300 Django .po files as 300
+# findings. Plain `text` stays in scope: requirements.txt carries real index URLs.
+_PROSE_LANGUAGES = frozenset({"markdown", "rst", "asciidoc", "gettext"})
+
+
 class PatternRegexScanner:
     """Applies the `patterns_*` packs to file text. Thread-safe once constructed."""
 
@@ -1536,6 +1542,8 @@ class PatternRegexScanner:
         for item in self.prepared:
             rule = item.rule
             if not rule.applies_to(path, language):
+                continue
+            if not rule.languages and language in _PROSE_LANGUAGES:
                 continue
             if not rule.prefilter(lowered):
                 continue

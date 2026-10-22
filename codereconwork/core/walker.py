@@ -72,7 +72,8 @@ LANGUAGE_BY_EXT: Dict[str, str] = {
     ".json": "json", ".yaml": "yaml", ".yml": "yaml", ".toml": "toml", ".ini": "ini",
     ".xml": "xml", ".properties": "properties", ".cfg": "ini", ".conf": "conf",
     ".tf": "terraform", ".tfvars": "terraform", ".hcl": "hcl",
-    ".env": "dotenv", ".md": "markdown", ".rst": "rst", ".txt": "text",
+    ".env": "dotenv", ".md": "markdown", ".rst": "rst", ".adoc": "asciidoc", ".txt": "text",
+    ".po": "gettext", ".pot": "gettext",
     ".dockerfile": "dockerfile", ".tpl": "template", ".j2": "jinja",
 }
 

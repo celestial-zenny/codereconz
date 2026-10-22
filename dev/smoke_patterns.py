@@ -266,6 +266,17 @@ resource "aws_s3_bucket" "public" {
 # acl = "public-read" in a comment must not be reported
 '''
 
+# Docs and translation catalogs quote insecure settings in prose. Language-agnostic
+# pattern rules must leave them alone; the secrets module still reads these files.
+PROSE_MD = '''
+Turn on `DEBUG=True` locally, or pass `verify=False` if your proxy re-signs TLS.
+'''
+
+PROSE_PO = '''
+msgid "More information is available with DEBUG=True."
+msgstr "Plus d'informations sont disponibles avec DEBUG=True."
+'''
+
 BROKEN_PY = '''
 def truncated(
     this file does not parse at all
@@ -277,6 +288,8 @@ FIXTURE = {
     "web/vulnerable.js": VULNERABLE_JS,
     "infra/main.tf": VULNERABLE_TF,
     "app/broken.py": BROKEN_PY,
+    "docs/settings.md": PROSE_MD,
+    "locale/fr/LC_MESSAGES/django.po": PROSE_PO,
 }
 
 # Every AST check must be exercised by the fixture above. Derived from the check table on
@@ -446,6 +459,13 @@ def main() -> int:
                 + ", ".join(f"{f.rule_id}@{f.line}" for f in clean_hits)
             )
 
+        prose_hits = [f for f in findings if f.path.endswith((".md", ".po"))]
+        if prose_hits:
+            failures.append(
+                "pattern rules fired on prose: "
+                + ", ".join(f"{f.rule_id}@{f.path}" for f in prose_hits)
+            )
+
         # 6. AST supersedes regex on the same line + CWE. The generic TLS regex rule and
         #    the AST verify=False check both cover the `requests.get(url, verify=False)`
         #    line, so exactly one finding must survive there.
@@ -486,7 +506,8 @@ def main() -> int:
             print(f"FAIL: {problem}")
         return 1
     print(
-        "PASS: AST + regex both fire, cap applied, comments filtered, clean.py silent, "
+        "PASS: AST + regex both fire, cap applied, comments filtered, clean.py and prose "
+        "silent, "
         "AST supersedes regex, parse failure reported, no leaks"
     )
     return 0
